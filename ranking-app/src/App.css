@@ -1,0 +1,57 @@
+
+#root {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(1px + 2vmin);
+  color: #444;
+  width: 100%;
+  background-color: #f0f0f0;
+  padding: 1px;
+  z-index: 1000;
+  height: 120px;
+  border-bottom: #9BC53D solid 4px;
+  margin-bottom: 10px;
+}
+
+.leaderboard-controller {
+  margin: 15px;
+}
+
+.leaderboard{
+  border-top: #7A7A7A solid 2px;
+}
+
+.divider {
+  width: 2px;
+  background-color: #9BC53D;
+  height: 50%;
+  margin: 0 20px;
+}
+
+.logo {
+  height: 6em;
+  padding: 0.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
