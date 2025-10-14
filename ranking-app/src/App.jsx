@@ -7,7 +7,6 @@ import { BsSkipBackwardFill } from "@react-icons/all-files/bs/BsSkipBackwardFill
 import { BsArrowRepeat } from "@react-icons/all-files/bs/BsArrowRepeat";
 
 function App() {
-  const [count, setCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [sheetValues, setSheetValues] = useState(null)
@@ -18,6 +17,33 @@ function App() {
   const AUTO_SPREADSHEET_ID = import.meta.env.VITE_AUTO_SPREADSHEET_ID
   const TELEOP_SPREADSHEET_ID = import.meta.env.VITE_TELEOP_SPREADSHEET_ID
   const SHEET_RANGE = 'RankingTeleop!A2:C18'
+
+  var actualTimeInLeaderboard = 0;
+  var timer;
+  var timerStopped = false;
+
+  startLeaderboardTimer();
+
+  function startLeaderboardTimer() {
+    timer = setInterval(() => {
+      actualTimeInLeaderboard = actualTimeInLeaderboard + 1;
+    }, 1000);
+    timerStopped = false;
+  }
+
+  function stopLeaderboardTimer() {
+    timerStopped = true;
+    clearInterval(timer);
+    actualTimeInLeaderboard = 0;
+  }
+
+  const toggleTimer = () => {
+    if(timerStopped){
+      startLeaderboardTimer()
+    }else{
+      stopLeaderboardTimer()
+    }
+  }
 
   const changeLeaderboardType = () => {
     if(leaderboardType === "Autônomo"){
@@ -97,7 +123,7 @@ function App() {
           <button onClick={changeLeaderboardType}>
           <BsSkipBackwardFill />
           </button>
-          <button onClick={() => setCount((count) => count + 1)}>
+          <button onClick={toggleTimer}>
           <BsFillPauseFill />
           </button>
           <button onClick={fetchActualTypeSheetData}>
@@ -112,8 +138,7 @@ function App() {
         <div id="switch-progress"></div>
       </div>
       <div className="leaderboard">
-        <h2 className=''>{leaderboard_type}</h2>
-        
+        <h2 className=''>{leaderboardType}</h2>
       </div>
       <div className="card">
         <div>
@@ -121,7 +146,7 @@ function App() {
             {isLoading ? 'Buscando...' : 'Consultar planilha'}
           </button>
           <button onClick={handleShowInterval} disabled={isLoading || !sheetValues}>
-            Mostrar intervalo
+            Mostrar intervalo + {actualTimeInLeaderboard}
           </button>
         </div>
         {error && <p role="alert">{error}</p>}
