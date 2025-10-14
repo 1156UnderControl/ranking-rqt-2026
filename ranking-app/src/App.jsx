@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import rqtLogo from './assets/logoRQT.svg'
 import './App.css'
 import { BsFillPauseFill } from "@react-icons/all-files/bs/BsFillPauseFill";
@@ -18,24 +18,30 @@ function App() {
   const TELEOP_SPREADSHEET_ID = import.meta.env.VITE_TELEOP_SPREADSHEET_ID
   const SHEET_RANGE = 'RankingTeleop!A2:C18'
 
-  var actualTimeInLeaderboard = 0;
-  var timer;
-  var timerStopped = false;
+  const [actualTimeInLeaderboard, setActualTimeInLeaderboard] = useState(0)
+  const [timerStopped, setTimerStopped] = useState(true)
+  const timerRef = useRef(null)
 
-  startLeaderboardTimer();
+  const startLeaderboardTimer = useCallback(() => {
+    if (timerRef.current) {
+      return
+    }
+    setActualTimeInLeaderboard(0)
+    timerRef.current = setInterval(() => {
+      setActualTimeInLeaderboard((previousTime) => previousTime + 1)
+    }, 1000)
+    setTimerStopped(false)
+  }, [])
 
-  function startLeaderboardTimer() {
-    timer = setInterval(() => {
-      actualTimeInLeaderboard = actualTimeInLeaderboard + 1;
-    }, 1000);
-    timerStopped = false;
-  }
-
-  function stopLeaderboardTimer() {
-    timerStopped = true;
-    clearInterval(timer);
-    actualTimeInLeaderboard = 0;
-  }
+  const stopLeaderboardTimer = useCallback(() => {
+    if (!timerRef.current) {
+      return
+    }
+    clearInterval(timerRef.current)
+    timerRef.current = null
+    setTimerStopped(true)
+    setActualTimeInLeaderboard(0)
+  }, [])
 
   const toggleTimer = () => {
     if(timerStopped){
@@ -111,6 +117,13 @@ function App() {
     setError(null)
     setShowValues(true)
   }
+
+  useEffect(() => {
+    startLeaderboardTimer()
+    return () => {
+      stopLeaderboardTimer()
+    }
+  }, [startLeaderboardTimer, stopLeaderboardTimer])
 
   return (
     <>
