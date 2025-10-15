@@ -16,11 +16,26 @@ function App() {
   const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY
   const AUTO_SPREADSHEET_ID = import.meta.env.VITE_AUTO_SPREADSHEET_ID
   const TELEOP_SPREADSHEET_ID = import.meta.env.VITE_TELEOP_SPREADSHEET_ID
-  const SHEET_RANGE = 'RankingTeleop!A2:C18'
-
+  const SHEET_RANGE_TELEOP = 'RankingTeleop!A2:C18'
+  const SHEET_RANGE_AUTO = 'RankingAutonomo!A2:C18'
   const [actualTimeInLeaderboard, setActualTimeInLeaderboard] = useState(0)
   const [timerStopped, setTimerStopped] = useState(true)
   const timerRef = useRef(null)
+  const sheetValuesWrapperRef = useRef(null)
+
+  const getRankingLabel = (index) => {
+    const position = index + 1
+    if (position === 1) {
+      return '🥇 1º'
+    }
+    if (position === 2) {
+      return '🥈 2º'
+    }
+    if (position === 3) {
+      return '🥉 3º'
+    }
+    return `#${position}`
+  }
 
   const startLeaderboardTimer = useCallback(() => {
     if (timerRef.current) {
@@ -68,16 +83,14 @@ function App() {
   }
 
   const fetchAutonomousSheetData = async () => {
-    setLeaderboardType("Autônomo")
-    await fetchSheetData(AUTO_SPREADSHEET_ID)
+    await fetchSheetData(AUTO_SPREADSHEET_ID, SHEET_RANGE_AUTO)
   }
 
   const fetchTeleopSheetData = async () => {
-    setLeaderboardType("Teleop")
-    await fetchSheetData(TELEOP_SPREADSHEET_ID)
+    await fetchSheetData(TELEOP_SPREADSHEET_ID, SHEET_RANGE_TELEOP)
   }
 
-  async function fetchSheetData(SPREADSHEET_ID){
+  async function fetchSheetData(SPREADSHEET_ID, SHEET_RANGE = SHEET_RANGE_AUTO) {
     if (!SPREADSHEET_ID) {
       setError('Spreadsheet ID Auto não configurada. Crie uma variável VITE_SPREADSHEET_ID no .env .')
       return
@@ -125,6 +138,63 @@ function App() {
     }
   }, [startLeaderboardTimer, stopLeaderboardTimer])
 
+  useEffect(() => {
+    if(actualTimeInLeaderboard > 60){
+      changeLeaderboardType()
+      fetchActualTypeSheetData()
+      setActualTimeInLeaderboard(0);
+    }
+  }, [actualTimeInLeaderboard])
+
+  useEffect(() => {
+    if (!showValues) {
+      return
+    }
+
+    const wrapper = sheetValuesWrapperRef.current
+
+    if (!wrapper) {
+      return
+    }
+
+    let animationFrameId
+    let lastTimestamp
+    const scrollSpeed = 20
+
+    const resetScroll = () => {
+      wrapper.scrollTop = 0
+      lastTimestamp = undefined
+    }
+
+    if (wrapper.scrollHeight <= wrapper.clientHeight) {
+      resetScroll()
+      return
+    }
+
+    const step = (timestamp) => {
+      if (lastTimestamp !== undefined) {
+        const delta = timestamp - lastTimestamp
+        const maxScrollTop = wrapper.scrollHeight - wrapper.clientHeight
+        wrapper.scrollTop += (scrollSpeed * delta) / 1000
+
+        if (wrapper.scrollTop >= maxScrollTop) {
+          resetScroll()
+        }
+      }
+
+      lastTimestamp = timestamp
+      animationFrameId = requestAnimationFrame(step)
+    }
+
+    animationFrameId = requestAnimationFrame(step)
+
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId)
+      }
+      resetScroll()
+    }
+  }, [showValues, sheetValues])
   return (
     <>
       <div className="header">
@@ -155,7 +225,7 @@ function App() {
       </div>
       <div className="card">
         <div>
-          <button onClick={fetchSheetData} disabled={isLoading}>
+          <button onClick={fetchActualTypeSheetData} disabled={isLoading}>
             {isLoading ? 'Buscando...' : 'Consultar planilha'}
           </button>
           <button onClick={handleShowInterval} disabled={isLoading || !sheetValues}>
@@ -164,17 +234,32 @@ function App() {
         </div>
         {error && <p role="alert">{error}</p>}
         {showValues && sheetValues && (
-          <table className="sheet-values">
-            <tbody>
-              {sheetValues.map((row, rowIndex) => (
-                <tr key={rowIndex}>
-                  {(Array.isArray(row) ? row : [row]).map((cell, cellIndex) => (
-                    <td key={cellIndex}>{cell}</td>
-                  ))}
+          <div ref={sheetValuesWrapperRef} className="sheet-values__wrapper">
+            <table className="sheet-values">
+              <thead>
+                <tr>
+                  <th className="sheet-values__rank">Ranking</th>
+                  <th className="sheet-values__team">Equipe</th>
+                  <th className="sheet-values__matches">Partidas jogadas</th>
+                  <th className="sheet-values__score">Pontuação</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {sheetValues.map((row, rowIndex) => {
+                  const cells = Array.isArray(row) ? row : [row]
+                  const [team = '-', matches = '-', score = '-'] = cells
+                  return (
+                    <tr key={rowIndex}>
+                      <td className="sheet-values__rank">{getRankingLabel(rowIndex)}</td>
+                      <td>{team || '-'}</td>
+                      <td className="sheet-values__matches">{matches || '-'}</td>
+                      <td className="sheet-values__score">{score || '-'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </>
