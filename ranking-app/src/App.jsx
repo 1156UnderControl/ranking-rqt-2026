@@ -72,6 +72,8 @@ function App() {
     }else{
       setLeaderboardType("Autônomo")
     }
+    fetchActualTypeSheetData()
+    setActualTimeInLeaderboard(0);
   }
 
   const fetchActualTypeSheetData = async () => {
@@ -80,6 +82,7 @@ function App() {
     }else{
       await fetchTeleopSheetData()
     }
+    handleShowInterval();
   }
 
   const fetchAutonomousSheetData = async () => {
@@ -141,8 +144,6 @@ function App() {
   useEffect(() => {
     if(actualTimeInLeaderboard > 60){
       changeLeaderboardType()
-      fetchActualTypeSheetData()
-      setActualTimeInLeaderboard(0);
     }
   }, [actualTimeInLeaderboard])
 
@@ -222,16 +223,6 @@ function App() {
       </div>
       <div className="leaderboard">
         <h2 className=''>{leaderboardType}</h2>
-      </div>
-      <div className="card">
-        <div>
-          <button onClick={fetchActualTypeSheetData} disabled={isLoading}>
-            {isLoading ? 'Buscando...' : 'Consultar planilha'}
-          </button>
-          <button onClick={handleShowInterval} disabled={isLoading || !sheetValues}>
-            Mostrar intervalo + {actualTimeInLeaderboard}
-          </button>
-        </div>
         {error && <p role="alert">{error}</p>}
         {showValues && sheetValues && (
           <div ref={sheetValuesWrapperRef} className="sheet-values__wrapper">
