@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import rqtLogo from './assets/logoRQT.svg'
 import './App.css'
 import { BsFillPauseFill } from "@react-icons/all-files/bs/BsFillPauseFill";
@@ -36,6 +36,60 @@ function App() {
     }
     return `#${position}`
   }
+
+  const parseNumber = (value, fallback = 0) => {
+    if (typeof value === 'string' && value.trim().toUpperCase() === '#DIV/0!') {
+      return 0
+    }
+
+    if (typeof value === 'number') {
+      return value
+    }
+
+    if (typeof value === 'string') {
+      const normalized = value.replace(/[^\d,.-]/g, '').replace(',', '.')
+      const parsed = Number(normalized)
+
+      if (Number.isFinite(parsed)) {
+        return parsed
+      }
+    }
+
+    return fallback
+  }
+
+  const sortedSheetValues = useMemo(() => {
+    if (!sheetValues) {
+      return []
+    }
+
+    return sheetValues
+      .map((row, index) => ({
+        row: Array.isArray(row) ? row : [row],
+        originalIndex: index,
+      }))
+      .sort((a, b) => {
+        const [, matchesARaw, scoreARaw] = a.row
+        const [, matchesBRaw, scoreBRaw] = b.row
+
+        const scoreA = parseNumber(scoreARaw, 0)
+        const scoreB = parseNumber(scoreBRaw, 0)
+
+        if (scoreA !== scoreB) {
+          return scoreB - scoreA
+        }
+
+        const matchesA = parseNumber(matchesARaw, Number.POSITIVE_INFINITY)
+        const matchesB = parseNumber(matchesBRaw, Number.POSITIVE_INFINITY)
+
+        if (matchesA !== matchesB) {
+          return matchesA - matchesB
+        }
+
+        return a.originalIndex - b.originalIndex
+      })
+      .map((entry) => entry.row)
+  }, [sheetValues])
 
   const startLeaderboardTimer = useCallback(() => {
     if (timerRef.current) {
@@ -177,7 +231,6 @@ function App() {
         const delta = timestamp - lastTimestamp
         const maxScrollTop = wrapper.scrollHeight - wrapper.clientHeight
         wrapper.scrollTop += (scrollSpeed * delta) / 1000
-
         if (wrapper.scrollTop >= maxScrollTop) {
           resetScroll()
         }
@@ -196,6 +249,7 @@ function App() {
       resetScroll()
     }
   }, [showValues, sheetValues])
+
   return (
     <>
       <div className="header">
@@ -223,6 +277,16 @@ function App() {
       </div>
       <div className="leaderboard">
         <h2 className=''>{leaderboardType}</h2>
+      </div>
+      <div className="card">
+        <div>
+          <button onClick={fetchActualTypeSheetData} disabled={isLoading}>
+            {isLoading ? 'Buscando...' : 'Consultar planilha'}
+          </button>
+          <button onClick={handleShowInterval} disabled={isLoading || !sheetValues}>
+            Mostrar intervalo + {actualTimeInLeaderboard}
+          </button>
+        </div>
         {error && <p role="alert">{error}</p>}
         {showValues && sheetValues && (
           <div ref={sheetValuesWrapperRef} className="sheet-values__wrapper">
@@ -236,15 +300,17 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {sheetValues.map((row, rowIndex) => {
-                  const cells = Array.isArray(row) ? row : [row]
-                  const [team = '-', matches = '-', score = '-'] = cells
+                {sortedSheetValues.map((row, rowIndex) => {
+                  const [team = '-', matches = '-', score = '-'] = row
+                  const teamValue = typeof team === 'string' && team.trim() !== '' ? team : '-'
+                  const matchesValue = parseNumber(matches, 0)
+                  const scoreValue = parseNumber(score, 0)
                   return (
                     <tr key={rowIndex}>
                       <td className="sheet-values__rank">{getRankingLabel(rowIndex)}</td>
-                      <td>{team || '-'}</td>
-                      <td className="sheet-values__matches">{matches || '-'}</td>
-                      <td className="sheet-values__score">{score || '-'}</td>
+                      <td>{teamValue}</td>
+                      <td className="sheet-values__matches">{matchesValue}</td>
+                      <td className="sheet-values__score">{scoreValue}</td>
                     </tr>
                   )
                 })}
