@@ -2,24 +2,33 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import rqtLogo from './assets/logoRQT.svg'
 import './App.css'
 import { BsFillPauseFill } from "@react-icons/all-files/bs/BsFillPauseFill";
+import { BsFillPlayFill } from "@react-icons/all-files/bs/BsFillPlayFill";
 import { BsSkipForwardFill } from "@react-icons/all-files/bs/BsSkipForwardFill";
 import { BsSkipBackwardFill } from "@react-icons/all-files/bs/BsSkipBackwardFill";
 import { BsArrowRepeat } from "@react-icons/all-files/bs/BsArrowRepeat";
+import { FaEye } from "@react-icons/all-files/fa/FaEye";
+import { FaEyeSlash } from "@react-icons/all-files/fa/FaEyeSlash";
+
 
 function App() {
+  const [lastFetchTime, setLastFetchTime] = useState(null);
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [sheetValues, setSheetValues] = useState(null)
   const [showValues, setShowValues] = useState(false)
-  const [leaderboardType, setLeaderboardType] = useState("Autônomo")
+  const [leaderboardType, setLeaderboardType] = useState("Autônomo Categoria 1")
+  const timeInResetRef = useRef(0)
 
   const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY
   const AUTO_SPREADSHEET_ID = import.meta.env.VITE_AUTO_SPREADSHEET_ID
   const TELEOP_SPREADSHEET_ID = import.meta.env.VITE_TELEOP_SPREADSHEET_ID
-  const SHEET_RANGE_TELEOP = 'RankingTeleop!A2:C18'
-  const SHEET_RANGE_AUTO = 'RankingAutonomo!A2:C18'
+  const SHEET_RANGE_TELEOP_CAT_1 = 'RankingTeleop1!A3:C13'
+  const SHEET_RANGE_TELEOP_CAT_2 = 'RankingTeleop2!A3:C8'
+  const SHEET_RANGE_AUTO_CAT_1 = 'RankingAutonomo1!A3:C13'
+  const SHEET_RANGE_AUTO_CAT_2 = 'RankingAutonomo2!A3:C8'
   const [actualTimeInLeaderboard, setActualTimeInLeaderboard] = useState(0)
   const [timerStopped, setTimerStopped] = useState(true)
+  const [hideController, setHideController] = useState(false);
   const timerRef = useRef(null)
   const sheetValuesWrapperRef = useRef(null)
 
@@ -121,33 +130,60 @@ function App() {
   }
 
   const changeLeaderboardType = () => {
-    if(leaderboardType === "Autônomo"){
-      setLeaderboardType("Teleop")
-    }else{
-      setLeaderboardType("Autônomo")
+    var nextType;
+
+    switch(leaderboardType){
+      case "Autônomo Categoria 1":
+        nextType = "Autônomo Categoria 2"
+        break;
+      case "Autônomo Categoria 2":
+        nextType = "Teleoperado Categoria 1"
+        break;
+      case "Teleoperado Categoria 1":
+        nextType = "Teleoperado Categoria 2"
+        break;
+      case "Teleoperado Categoria 2":
+        nextType = "Autônomo Categoria 1"
+        break;
+      default:
+        nextType = "Autônomo Categoria 1"
     }
-    fetchActualTypeSheetData()
-    setActualTimeInLeaderboard(0);
+    console.log("Changing leaderboard to: ", nextType);
+    setLeaderboardType(nextType)
+    setActualTimeInLeaderboard(0)
   }
 
+  useEffect(() => {
+    fetchActualTypeSheetData()
+  }, [leaderboardType])
+
   const fetchActualTypeSheetData = async () => {
-    if(leaderboardType === "Autônomo"){
+    if(leaderboardType.includes("Autônomo")){
       await fetchAutonomousSheetData()
-    }else{
+    }else{  
       await fetchTeleopSheetData()
     }
-    handleShowInterval();
   }
 
   const fetchAutonomousSheetData = async () => {
-    await fetchSheetData(AUTO_SPREADSHEET_ID, SHEET_RANGE_AUTO)
+    console.log("Fetching autonomous sheet data for type: ", leaderboardType);
+    if(leaderboardType === "Autônomo Categoria 1"){
+      await fetchSheetData(AUTO_SPREADSHEET_ID, SHEET_RANGE_AUTO_CAT_1)
+    }else{
+      await fetchSheetData(AUTO_SPREADSHEET_ID, SHEET_RANGE_AUTO_CAT_2)
+    }
   }
 
   const fetchTeleopSheetData = async () => {
-    await fetchSheetData(TELEOP_SPREADSHEET_ID, SHEET_RANGE_TELEOP)
+    if(leaderboardType === "Teleoperado Categoria 1"){
+      await fetchSheetData(TELEOP_SPREADSHEET_ID, SHEET_RANGE_TELEOP_CAT_1)
+    }else{
+      await fetchSheetData(TELEOP_SPREADSHEET_ID, SHEET_RANGE_TELEOP_CAT_2)
+    }
   }
 
   async function fetchSheetData(SPREADSHEET_ID, SHEET_RANGE = SHEET_RANGE_AUTO) {
+    console.log("Fetching sheet data for: ", SPREADSHEET_ID, SHEET_RANGE);
     if (!SPREADSHEET_ID) {
       setError('Spreadsheet ID Auto não configurada. Crie uma variável VITE_SPREADSHEET_ID no .env .')
       return
@@ -169,23 +205,15 @@ function App() {
       }
       const data = await response.json()
       setSheetValues(data.values || [])
+      setShowValues(true)
+      setLastFetchTime(new Date().getHours() + ':' + new Date().getMinutes().toString().padStart(2, '0'));
     } catch (err) {
       setSheetValues(null)
       setError(err.message)
+      setShowValues(false)
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const handleShowInterval = () => {
-    if (!sheetValues) {
-      setError('Nenhum dado carregado ainda. Clique em Consultar planilha primeiro.')
-      return
-    }
-    console.log(sheetValues)
-
-    setError(null)
-    setShowValues(true)
   }
 
   useEffect(() => {
@@ -196,13 +224,17 @@ function App() {
   }, [startLeaderboardTimer, stopLeaderboardTimer])
 
   useEffect(() => {
-    if(actualTimeInLeaderboard > 60){
+    fetchActualTypeSheetData()
+  }, [])
+
+  useEffect(() => {
+    if(actualTimeInLeaderboard > 40){
       changeLeaderboardType()
     }
   }, [actualTimeInLeaderboard])
 
   useEffect(() => {
-    if (!showValues) {
+    if (!showValues || sortedSheetValues.length === 0) {
       return
     }
 
@@ -214,28 +246,34 @@ function App() {
 
     let animationFrameId
     let lastTimestamp
-    const scrollSpeed = 20
+    let scrollPosition = 0
+    const scrollSpeed = 35
 
     const resetScroll = () => {
+      scrollPosition = 0
       wrapper.scrollTop = 0
-      lastTimestamp = undefined
-    }
-
-    if (wrapper.scrollHeight <= wrapper.clientHeight) {
-      resetScroll()
-      return
+      lastTimestamp = undefined 
+      timeInResetRef.current = 0
     }
 
     const step = (timestamp) => {
       if (lastTimestamp !== undefined) {
         const delta = timestamp - lastTimestamp
         const maxScrollTop = wrapper.scrollHeight - wrapper.clientHeight
-        wrapper.scrollTop += (scrollSpeed * delta) / 1000
-        if (wrapper.scrollTop >= maxScrollTop) {
-          resetScroll()
+        const increment = (scrollSpeed * delta) / 1000
+        if(scrollPosition <= maxScrollTop-3){
+          timeInResetRef.current = 0
+          scrollPosition = (scrollPosition + increment) % maxScrollTop
+        }else{
+          timeInResetRef.current += 1
+          if(timeInResetRef.current > 100){
+            scrollPosition = (scrollPosition + increment) % maxScrollTop
+          }else{
+            scrollPosition = maxScrollTop;
+          }
         }
+        wrapper.scrollTop = scrollPosition
       }
-
       lastTimestamp = timestamp
       animationFrameId = requestAnimationFrame(step)
     }
@@ -248,21 +286,42 @@ function App() {
       }
       resetScroll()
     }
-  }, [showValues, sheetValues])
+  }, [showValues, sortedSheetValues])
+
+  const toggleHideController = () => {
+    setHideController((prev) => !prev);
+  }
+
+  function rightIconForTimer(){
+    if(timerStopped){
+      return <BsFillPlayFill />
+    }else{
+      return <BsFillPauseFill />
+    }
+  }
+
+  function hideControllerIcon(){
+    if(hideController){
+      return <FaEye />
+    }else{
+      return <FaEyeSlash />
+    }
+  }
 
   return (
     <>
       <div className="header">
+        <button onClick={toggleHideController} className='hide-leaderboard-controller-button'>
+          {hideControllerIcon()}
+        </button>
         <img src={rqtLogo} className="logo" alt="RQT Logo" />
         <div className="divider"></div>
         <h1>Ranking RQT 🏆</h1>
       </div>
-      <div className="leaderboard-controller">
-          <button onClick={changeLeaderboardType}>
-          <BsSkipBackwardFill />
-          </button>
+      {!hideController && (      
+        <div className="leaderboard-controller">
           <button onClick={toggleTimer}>
-          <BsFillPauseFill />
+          {rightIconForTimer()}
           </button>
           <button onClick={fetchActualTypeSheetData}>
           <BsArrowRepeat />
@@ -270,25 +329,18 @@ function App() {
           <button onClick={changeLeaderboardType}>
           <BsSkipForwardFill />
           </button>
-      </div>
-      <h4>Ultima atualização: </h4>
+          <h4>Ultima atualização: {lastFetchTime} </h4>
+        </div>
+        )
+      }
       <div className="leaderboard-status__bar">
         <div id="switch-progress"></div>
       </div>
       <div className="leaderboard">
         <h2 className=''>{leaderboardType}</h2>
-      </div>
-      <div className="card">
-        <div>
-          <button onClick={fetchActualTypeSheetData} disabled={isLoading}>
-            {isLoading ? 'Buscando...' : 'Consultar planilha'}
-          </button>
-          <button onClick={handleShowInterval} disabled={isLoading || !sheetValues}>
-            Mostrar intervalo + {actualTimeInLeaderboard}
-          </button>
-        </div>
         {error && <p role="alert">{error}</p>}
-        {showValues && sheetValues && (
+        {isLoading && <p>Buscando dados...</p>}
+        {showValues && (
           <div ref={sheetValuesWrapperRef} className="sheet-values__wrapper">
             <table className="sheet-values">
               <thead>
