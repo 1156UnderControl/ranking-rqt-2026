@@ -23,12 +23,39 @@
   margin-bottom: 10px;
 }
 
-.leaderboard-controller {
-  margin: 15px;
+.hide-leaderboard-controller-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 18px 0 6px;
+  margin-right: 20px;
+  width: auto;
+  height: auto;
+  padding: 2 px;
+  border: none;
+  background: none;
+  color: #000;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
 }
 
-.leaderboard{
-  border-top: #7A7A7A solid 2px;
+.hide-leaderboard-controller-button:hover {
+  opacity: 0.65;
+}
+
+.hide-leaderboard-controller-button:focus-visible {
+  outline: 2px solid rgba(0, 0, 0, 0.35);
+  outline-offset: 2px;
+}
+
+.hide-leaderboard-controller-button svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  color: currentColor;
+}
+
+.leaderboard-controller {
+  margin: 15px;
 }
 
 .divider {
@@ -44,9 +71,6 @@
   will-change: filter;
   transition: filter 300ms;
 }
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
 
 .card {
   padding: 2em;
@@ -58,10 +82,10 @@
 
 .sheet-values__wrapper {
   margin: 20px auto;
-  max-height: 320px;
+  max-height: 800px;
   overflow-y: auto;
-  width: 80%;
-  max-width: 960px;
+  width: 90%;
+  max-width: 2000px;
   border-radius: 6px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   background-color: #fff;
