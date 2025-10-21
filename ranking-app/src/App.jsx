@@ -32,8 +32,7 @@ function App() {
   const timerRef = useRef(null)
   const sheetValuesWrapperRef = useRef(null)
 
-  const getRankingLabel = (index) => {
-    const position = index + 1
+  const getRankingLabel = (position) => {
     if (position === 1) {
       return '🥇 1º'
     }
@@ -71,10 +70,9 @@ function App() {
     if (!sheetValues) {
       return []
     }
-
     return sheetValues
       .map((row, index) => ({
-        row: Array.isArray(row) ? row : [row],
+        row: row,
         originalIndex: index,
       }))
       .sort((a, b) => {
@@ -95,10 +93,31 @@ function App() {
           return matchesA - matchesB
         }
 
+        a.ranking = b.ranking = a.originalIndex
         return a.originalIndex - b.originalIndex
       })
       .map((entry) => entry.row)
   }, [sheetValues])
+
+const ranks = useMemo(() => {
+  const out = [];
+  let lastScore = null;
+  let lastRank = 0;
+  let seen = 0;
+
+  for (const row of sortedSheetValues) {
+    seen++;
+    const score = parseNumber(row[2], 0);
+
+    if (score !== lastScore) {
+      lastRank = seen;
+      lastScore = score;
+    }
+    out.push(lastRank);
+  }
+  return out;
+}, [sortedSheetValues]);
+
 
   const startLeaderboardTimer = useCallback(() => {
     if (timerRef.current) {
@@ -359,7 +378,7 @@ function App() {
                   const scoreValue = parseNumber(score, 0)
                   return (
                     <tr key={rowIndex}>
-                      <td className="sheet-values__rank">{getRankingLabel(rowIndex)}</td>
+                      <td className="sheet-values__rank">{getRankingLabel(ranks[rowIndex])}</td>
                       <td>{teamValue}</td>
                       <td className="sheet-values__matches">{matchesValue}</td>
                       <td className="sheet-values__score">{scoreValue}</td>
