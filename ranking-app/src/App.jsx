@@ -76,6 +76,29 @@ function App() {
         originalIndex: index,
       }))
       .sort((a, b) => {
+        if(leaderboardType.includes("Autônomo")){
+          const [, matchesARaw, faultsAraw, best1ARaw, best2ARaw] = a.row
+          const [, matchesBRaw, faultsBraw, best1BRaw, best2BRaw] = b.row
+
+          const best1A = parseNumber(best1ARaw, 0)
+          const best1B = parseNumber(best1BRaw, 0)
+
+          if (best1A !== best1B) {
+            return best1B - best1A
+          }
+
+          const best2A = parseNumber(best2ARaw, 0)
+          const best2B = parseNumber(best2BRaw, 0)
+
+          if (best2A !== best2B) {
+            return best2B - best2A
+          }
+
+          const faultsA = parseNumber(faultsAraw, Number.POSITIVE_INFINITY)
+          const faultsB = parseNumber(faultsBraw, Number.POSITIVE_INFINITY)
+
+          return faultsA - faultsB
+        }
         const [, matchesARaw, scoreARaw] = a.row
         const [, matchesBRaw, scoreBRaw] = b.row
 
@@ -93,7 +116,6 @@ function App() {
           return matchesA - matchesB
         }
 
-        a.ranking = b.ranking = a.originalIndex
         return a.originalIndex - b.originalIndex
       })
       .map((entry) => entry.row)
