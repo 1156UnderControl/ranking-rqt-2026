@@ -24,8 +24,8 @@ function App() {
   const TELEOP_SPREADSHEET_ID = import.meta.env.VITE_TELEOP_SPREADSHEET_ID
   const SHEET_RANGE_TELEOP_CAT_1 = 'RankingTeleop1!A3:C13'
   const SHEET_RANGE_TELEOP_CAT_2 = 'RankingTeleop2!A3:C8'
-  const SHEET_RANGE_AUTO_CAT_1 = 'RankingAutonomo1!A3:C13'
-  const SHEET_RANGE_AUTO_CAT_2 = 'RankingAutonomo2!A3:C8'
+  const SHEET_RANGE_AUTO_CAT_1 = 'RankingAutonomo1!A3:E13'
+  const SHEET_RANGE_AUTO_CAT_2 = 'RankingAutonomo2!A3:E8'
   const [actualTimeInLeaderboard, setActualTimeInLeaderboard] = useState(0)
   const [timerStopped, setTimerStopped] = useState(true)
   const [hideController, setHideController] = useState(false);
@@ -327,6 +327,78 @@ const ranks = useMemo(() => {
     }
   }
 
+  function getRightTh(){
+    if(leaderboardType.includes("Autônomo")){
+      return (
+        <>
+          <th className="sheet-values__rank">Ranking</th>
+          <th className="sheet-values__team">Equipe</th>
+          <th className="sheet-values__matches">Partidas jogadas</th>
+          <th className="sheet-values__score">Faltas</th>
+          <th className="sheet-values__score">Melhor pontuação</th>
+          <th className="sheet-values__score">Segunda melhor pontuação</th>
+        </>
+      )
+    }else{
+      return (
+        <>
+          <th className="sheet-values__rank">Ranking</th>
+          <th className="sheet-values__team">Equipe</th>
+          <th className="sheet-values__matches">Partidas jogadas</th>
+          <th className="sheet-values__score">Pontuação</th>
+        </>
+      )    }
+  }
+
+  function getRightTbody(){
+    if(leaderboardType.includes("Autônomo")){
+      return (
+        <>
+          <tbody>
+            {sortedSheetValues.map((row, rowIndex) => {
+              const [team = '-', matches = '-', faults = '-', best1 = '-', best2 = '-'] = row
+              const teamValue = typeof team === 'string' && team.trim() !== '' ? team : '-'
+              const matchesValue = parseNumber(matches, 0)
+              const faultValue = parseNumber(faults, 0)
+              const best1Value = parseNumber(best1, 0)
+              const best2Value = parseNumber(best2, 0);
+              return (
+                <tr key={rowIndex}>
+                  <td className="sheet-values__rank">{getRankingLabel(ranks[rowIndex])}</td>
+                  <td>{teamValue}</td>
+                  <td className="sheet-values__matches">{matchesValue}</td>
+                  <td className="sheet-values__score">{faultValue}</td>
+                  <td className="sheet-values__score">{best1Value}</td>
+                  <td className="sheet-values__score">{best2Value}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </>
+      )
+    }else{
+      return (
+        <>
+          <tbody>
+            {sortedSheetValues.map((row, rowIndex) => {
+              const [team = '-', matches = '-', score = '-'] = row
+              const teamValue = typeof team === 'string' && team.trim() !== '' ? team : '-'
+              const matchesValue = parseNumber(matches, 0)
+              const scoreValue = parseNumber(score, 0)
+              return (
+                <tr key={rowIndex}>
+                  <td className="sheet-values__rank">{getRankingLabel(ranks[rowIndex])}</td>
+                  <td>{teamValue}</td>
+                  <td className="sheet-values__matches">{matchesValue}</td>
+                  <td className="sheet-values__score">{scoreValue}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </>
+      )    }
+  }
+
   return (
     <>
       <div className="header">
@@ -364,28 +436,10 @@ const ranks = useMemo(() => {
             <table className="sheet-values">
               <thead>
                 <tr>
-                  <th className="sheet-values__rank">Ranking</th>
-                  <th className="sheet-values__team">Equipe</th>
-                  <th className="sheet-values__matches">Partidas jogadas</th>
-                  <th className="sheet-values__score">Pontuação</th>
+                  {getRightTh()}
                 </tr>
               </thead>
-              <tbody>
-                {sortedSheetValues.map((row, rowIndex) => {
-                  const [team = '-', matches = '-', score = '-'] = row
-                  const teamValue = typeof team === 'string' && team.trim() !== '' ? team : '-'
-                  const matchesValue = parseNumber(matches, 0)
-                  const scoreValue = parseNumber(score, 0)
-                  return (
-                    <tr key={rowIndex}>
-                      <td className="sheet-values__rank">{getRankingLabel(ranks[rowIndex])}</td>
-                      <td>{teamValue}</td>
-                      <td className="sheet-values__matches">{matchesValue}</td>
-                      <td className="sheet-values__score">{scoreValue}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
+                {getRightTbody()}
             </table>
           </div>
         )}
