@@ -157,6 +157,8 @@ const API_BASE = location.hostname==='127.0.0.1' ? location.origin : 'https://cr
 const $ = id => document.getElementById(id);
 const sound = new MatchSound();
 let shared=null, anchorServer=0, anchorLocal=0, lastSuccess=0, busy=false, polling=false;
+let syncRequest=null;
+const peerChannel=typeof BroadcastChannel!=='undefined'?new BroadcastChannel('rqt-shared-clock-v2'):null;
 let renderedState='',renderedSecond=-1,wakeLock=null,previewTimeout;
 let audioKey='',seenStart='',matches=[],scheduleError='',scheduleUpdated=0;
 const now=()=>anchorServer+(performance.now()-anchorLocal);
@@ -189,17 +191,43 @@ function scheduleAudio(){
   sound.horn('end',Math.max(0,(shared.deadline-now())/1000),'end');
  }
 }
-function apply(data,sent){
+function apply(data,sent,relay=true){
  if(!Number.isSafeInteger(data.revision)||!Number.isFinite(data.serverNow))throw new Error('Resposta inválida');
- if(shared && data.revision<shared.revision)return;
+ if(shared && (data.revision<shared.revision || data.revision===shared.revision && data.serverNow<shared.serverNow))return;
+ const changed=!shared||data.revision!==shared.revision;
  anchorServer=data.serverNow+(performance.now()-sent)/2;anchorLocal=performance.now();lastSuccess=anchorLocal;
  shared=data;matchDuration=data.duration;$('duration').value=String(matchDuration);scheduleAudio();render();renderMatch();
  if(timer.state==='running')acquireWakeLock();else releaseWakeLock();
+ if(relay && changed)publishToPeers();
 }
-async function sync(){
- if(polling)return;polling=true;const sent=performance.now();
- try{const res=await fetch(API_BASE+'/api/timer',{cache:'no-store',signal:AbortSignal.timeout(2500)});if(!res.ok)throw new Error();apply(await res.json(),sent);}
- catch{render();}finally{polling=false;}
+function publishToPeers(){
+ if(!healthy())return;
+ peerChannel?.postMessage({type:'state',data:{...shared,serverNow:now()},sentAt:performance.timeOrigin+performance.now()});
+}
+peerChannel?.addEventListener('message',event=>{
+ const packet=event.data;
+ if(packet?.type==='request'){publishToPeers();return;}
+ if(packet?.type!=='state'||!packet.data||!Number.isFinite(packet.sentAt))return;
+ const transit=performance.timeOrigin+performance.now()-packet.sentAt;
+ if(transit< -100 || transit>4000)return;
+ const data=packet.data;
+ if(!['ready','running','paused','finished'].includes(data.state)||![150000,300000].includes(data.duration)||!Number.isFinite(data.remaining))return;
+ try{apply({...data,serverNow:data.serverNow+Math.max(0,transit)},performance.now(),false);}catch{}
+});
+async function sync(force=false){
+ if(syncRequest && !force)return;
+ if(force)syncRequest?.abort();
+ const controller=new AbortController();syncRequest=controller;
+ const sent=performance.now();const timeout=setTimeout(()=>controller.abort(),2500);
+ try{
+  const res=await fetch(API_BASE+'/api/timer?fresh='+Date.now(),{cache:'no-store',signal:controller.signal});
+  if(!res.ok)throw new Error();const data=await res.json();
+  if(syncRequest===controller)apply(data,sent);
+ }catch{render();}finally{clearTimeout(timeout);if(syncRequest===controller)syncRequest=null;}
+}
+function wakeSync(){
+ // Render the elapsed shared deadline immediately, even before the request completes.
+ render();renderMatch();peerChannel?.postMessage({type:'request'});sync(true);acquireWakeLock();
 }
 async function command(action,extra={}){
  if(busy||!healthy())return;
@@ -278,9 +306,11 @@ $('audio-enable').addEventListener('click',prepareAudio);$('mute').addEventListe
 $('match-prev').addEventListener('click',()=>moveMatch(-1));$('match-next').addEventListener('click',()=>moveMatch(1));$('match-auto').addEventListener('click',()=>command('select',{match:null}));
 document.addEventListener('fullscreenchange',()=>presentationState(Boolean(document.fullscreenElement)));
 document.addEventListener('keydown',event=>{if(event.repeat||event.ctrlKey||event.metaKey||event.altKey||event.target.closest('input,textarea,select,[contenteditable=true]'))return;if(event.code==='Space'){event.preventDefault();primaryAction();}else if(event.key.toLowerCase()==='r'){event.preventDefault();reset();}else if(event.key.toLowerCase()==='f'){event.preventDefault();toggleFullscreen();}});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){sync();acquireWakeLock();}});
-window.addEventListener('pagehide',()=>{sound.cancel();releaseWakeLock();});
-render();sync();refreshSchedule();setInterval(sync,500);setInterval(()=>{render();renderMatch();},100);setInterval(refreshSchedule,30000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')wakeSync();});
+window.addEventListener('focus',wakeSync);window.addEventListener('pageshow',wakeSync);window.addEventListener('online',wakeSync);
+window.addEventListener('message',event=>{if(event.source===window.parent && event.data?.type==='rqt-sync-now')wakeSync();});
+window.addEventListener('pagehide',()=>{sound.cancel();audioKey='';releaseWakeLock();});
+render();peerChannel?.postMessage({type:'request'});sync();refreshSchedule();setInterval(sync,500);setInterval(()=>{render();renderMatch();},100);setInterval(refreshSchedule,30000);
 
 })();
 </script>

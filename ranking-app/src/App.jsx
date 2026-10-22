@@ -26,6 +26,17 @@ export default function App() {
     window.addEventListener('popstate', sync)
     return () => {window.removeEventListener('hashchange', sync); window.removeEventListener('popstate', sync)}
   }, [])
+  useEffect(() => {
+    const wakeTimer = () => {
+      const frame = document.querySelector('.timer-view iframe')
+      frame?.contentWindow?.postMessage({type: 'rqt-sync-now'}, window.location.origin)
+    }
+    window.addEventListener('focus', wakeTimer)
+    window.addEventListener('pageshow', wakeTimer)
+    const visible = () => {if (document.visibilityState === 'visible') wakeTimer()}
+    document.addEventListener('visibilitychange', visible)
+    return () => {window.removeEventListener('focus', wakeTimer); window.removeEventListener('pageshow', wakeTimer); document.removeEventListener('visibilitychange', visible)}
+  }, [])
   const [sources, setSources] = useState({})
   const [boardIndex, setBoardIndex] = useState(0)
   const [pageIndex, setPageIndex] = useState(0)
@@ -121,7 +132,7 @@ export default function App() {
       <div className="view-toggle" role="group" aria-label="Exibição do telão"><button aria-pressed={view === 'ranking'} onClick={() => changeView('ranking')}>Ranking</button><button aria-pressed={view === 'schedule'} onClick={() => changeView('schedule')}>Cronograma</button><button aria-pressed={view === 'timer'} onClick={() => changeView('timer')}>Cronômetro</button></div>
     </header>
     {view === 'timer' && <main className="timer-view">
-      <iframe src="/cronometro/index.html" title="Cronômetro de partidas RQT" allow="autoplay; fullscreen; screen-wake-lock" allowFullScreen />
+      <iframe src="/cronometro/index.html?v=sync-tabs-2" title="Cronômetro de partidas RQT" allow="autoplay; fullscreen; screen-wake-lock" allowFullScreen />
     </main>}
     {view === 'schedule' && <Schedule hidden={hidden} fullscreen={fullscreen} />}
     {view === 'schedule' && fullscreenError && <p role="status">{fullscreenError}</p>}
