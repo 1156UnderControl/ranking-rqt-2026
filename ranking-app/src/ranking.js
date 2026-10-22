@@ -1,5 +1,12 @@
 export const normalize = value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLowerCase()
 
+export function normalizeMethod(value) {
+  const method = normalize(value).replace(/[\s-]+/g, '')
+  if (method === 'autonomo') return 'autonomo'
+  if (['teleop', 'teleoperado', 'manual'].includes(method)) return 'teleoperado'
+  return null
+}
+
 function count(value, label) {
   const text = String(value ?? '').trim().replace(',', '.')
   const number = Number(text)
@@ -71,9 +78,9 @@ export function buildRankings({mode, data, calculated, rosters}) {
       if (faults !== count(row[mode === 'hybrid' ? 3 : 4], 'Faltas em DATA')) throw new Error(`Partida ${id}: penalidades de DATA e CALC ainda não correspondem`)
       let autonomous = false
       if (mode === 'hybrid') {
-        const method = normalize(calc[7])
-        if (!['autonomo', 'teleoperado', 'tele-operado', 'manual'].includes(method)) throw new Error('Modalidade inválida em CALC')
-        if (method !== normalize(row[8])) throw new Error(`Partida ${id}: método de DATA e CALC ainda não corresponde`)
+        const method = normalizeMethod(calc[7])
+        if (!method) throw new Error('Modalidade inválida em CALC')
+        if (method !== normalizeMethod(row[8])) throw new Error(`Partida ${id}: método de DATA e CALC ainda não corresponde`)
         autonomous = method === 'autonomo'
       }
       const result = {score: readFinalScore(calc[9]), autonomous, faults}

@@ -3,5 +3,5 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "functions": {"api/rankings.js": {"maxDuration": 30}}
+  "functions": {"api/rankings.js": {"maxDuration": 30}, "api/schedule.js": {"maxDuration": 30}}
 }

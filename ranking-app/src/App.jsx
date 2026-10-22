@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
 import rqtLogo from './assets/logoRQT.svg'
 import './App.css'
+import Schedule from './Schedule.jsx'
 
 const BOARDS = [
   {mode: 'hybrid', category: 0, label: 'Híbrido Categoria 1'},
@@ -12,6 +13,9 @@ const number = value => value.toLocaleString('pt-BR', {maximumFractionDigits: 2}
 const medal = rank => rank <= 3 ? `${['🥇', '🥈', '🥉'][rank - 1]} ${rank}º` : `${rank}º`
 
 export default function App() {
+  const [view, setView] = useState(() => window.location.hash === '#cronograma' ? 'schedule' : 'ranking')
+  const changeView = next => {setView(next); window.history.replaceState(null, '', next === 'schedule' ? '#cronograma' : window.location.pathname + window.location.search)}
+  useEffect(() => {const sync = () => setView(window.location.hash === '#cronograma' ? 'schedule' : 'ranking'); window.addEventListener('hashchange', sync); return () => window.removeEventListener('hashchange', sync)}, [])
   const [sources, setSources] = useState({})
   const [boardIndex, setBoardIndex] = useState(0)
   const [pageIndex, setPageIndex] = useState(0)
@@ -84,11 +88,11 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (!playing) return
+    if (!playing || view !== 'ranking') return
     const interval = setInterval(() => setElapsed(value => value + 1), 1000)
     return () => clearInterval(interval)
-  }, [playing])
-  useEffect(() => {if (elapsed >= duration) next()}, [elapsed, duration, next])
+  }, [playing, view])
+  useEffect(() => {if (view === 'ranking' && elapsed >= duration) next()}, [elapsed, duration, next, view])
 
   const fullscreen = async () => {
     try {
@@ -103,8 +107,12 @@ export default function App() {
       <button onClick={() => setHidden(value => !value)} className="hide-leaderboard-controller-button" aria-label={hidden ? 'Mostrar controles' : 'Ocultar controles'} title={hidden ? 'Mostrar controles' : 'Ocultar controles'}>{hidden ? '◉' : '◌'}</button>
       <img src={rqtLogo} className="logo" alt="Robôs Que Transformam" />
       <div className="divider" />
-      <h1>Ranking RQT 🏆 <small>2026</small></h1>
+      <h1>{view === 'schedule' ? 'Cronograma RQT' : 'Ranking RQT 🏆'} <small>2026</small></h1>
+      <div className="view-toggle" role="group" aria-label="Exibição do telão"><button aria-pressed={view === 'ranking'} onClick={() => changeView('ranking')}>Ranking</button><button aria-pressed={view === 'schedule'} onClick={() => changeView('schedule')}>Cronograma</button></div>
     </header>
+    {view === 'schedule' && <Schedule hidden={hidden} fullscreen={fullscreen} />}
+    {view === 'schedule' && fullscreenError && <p role="status">{fullscreenError}</p>}
+    <div className="ranking-view" hidden={view !== 'ranking'}>
     {!hidden && <nav className="leaderboard-controller" aria-label="Controles do telão">
       <button onClick={previous} aria-label="Página anterior" title="Página anterior">⏮</button>
       <button onClick={() => setPlaying(value => !value)} aria-label={playing ? 'Pausar alternância' : 'Iniciar alternância'} title={playing ? 'Pausar alternância' : 'Iniciar alternância'}>{playing ? 'Ⅱ' : '▶'}</button>
@@ -139,5 +147,6 @@ export default function App() {
       </div>
       <footer>Empates em todos os critérios mantêm a mesma posição. {rows.length} equipes nesta categoria. Média exibida com até 2 casas; classificação sem arredondamento.</footer>
     </main>
+    </div>
   </>
 }

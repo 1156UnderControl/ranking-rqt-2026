@@ -65,3 +65,9 @@ Na Vercel, importe o novo repositório com Root Directory `ranking-app`, framewo
 4. Algumas fórmulas teleoperadas contêm `#REF!`.
 
 A aplicação segue o edital para classificação e desempate, com a interpretação de método confirmada pelo organizador. A pontuação das partidas, inclusive os descontos dos discos, permanece sob responsabilidade da planilha, conforme orientação do organizador. As imagens de pontuação herdadas na raiz do repositório são do sistema de 2025; não são usadas como regras de 2026.
+
+## Cronograma do telão
+
+O botão Ranking / Cronograma alterna as telas. O link `/#cronograma` abre diretamente a programação. As seções disponíveis são programação geral, mesas híbridas, mesas teleoperadas, Desafio Pesquisa e números das equipes. Cada seção possui paginação automática, pausa, navegação manual e duração configurável. A alternância do ranking é suspensa enquanto o cronograma está aberto.
+
+A API `/api/schedule` lê somente `cronograma impressão!A1:H150` da planilha `1MoXLsNdB4P640zFobHNeUsguvxNHx9WrA4RWYuv0Ma0` (gid `1518659089`). A exportação CSV preserva os campos mistos que a inferência de tipos do gviz omite. A atualização ocorre a cada 30 segundos, com cache de até 10 segundos; falhas preservam os últimos dados válidos e mostram um aviso. Os horários são apresentados como previstos, sem inferir a atividade em andamento ou uma data não informada na planilha. A identificação de alianças usa somente a relação de equipes da mesma aba.

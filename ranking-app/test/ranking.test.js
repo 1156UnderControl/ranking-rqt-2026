@@ -145,3 +145,22 @@ test('endpoint rejects unknown source and non-read methods',async()=>{
   assert.equal(response.code,405)
   assert.equal(response.headers.Allow,'GET')
 })
+
+test('real Tele-Op sheet value counts 270 points without autonomous credit or a second adjustment',()=>{
+  for(const method of ['Tele-Op','teleop','TELE OP','Teleoperado','Tele-operado']) {
+    const match=h('1,2','A',270,4,method)
+    match.data[8]='Tele-Op'
+    const {categories,warnings}=rank('hybrid',[match])
+    assert.deepEqual(warnings,[])
+    assert.equal(categories[0][0].total,270)
+    assert.equal(categories[0][0].matches,1)
+    assert.equal(categories[0][0].autonomousMatches,0)
+    assert.equal(categories[0][0].faults,4)
+  }
+})
+test('method aliases do not hide a real autonomous versus teleop mismatch',()=>{
+  const match=h('1,2','A',270,4,'Tele-Op');match.data[8]='Autonomo'
+  const {categories,warnings}=rank('hybrid',[match])
+  assert.equal(categories[0][0].matches,0)
+  assert.match(warnings[0],/método de DATA e CALC/)
+})
