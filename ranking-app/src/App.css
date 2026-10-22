@@ -9,3 +9,6 @@
 
 .timer-view{display:flex;flex:1;min-height:0;width:100%;background:#fff}.timer-view iframe{display:block;width:100%;height:100%;border:0;flex:1}
 @media(min-width:601px) and (max-width:1000px){.header .view-toggle{margin-left:12px}.header .view-toggle button{padding:8px}.header h1{font-size:26px}.header .divider{margin:0 12px}}
+
+.ranking-qr{display:flex;flex-direction:column;align-items:center;flex-shrink:0;margin:0 16px;color:#354d1e;font-size:11px;text-decoration:none}.ranking-qr img{width:90px;height:90px;background:white}.public-categories{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:12px}.public-categories button[aria-pressed="true"]{background:#466b19;color:white}.public-header h1{font-size:32px}.public-ranking .sheet-values th{z-index:1}
+@media(max-width:700px){.ranking-qr{margin:0 4px;font-size:9px}.ranking-qr img{width:66px;height:66px}.public-header h1{font-size:24px}.public-categories{gap:4px;padding:8px}.public-categories button{font-size:12px;padding:8px}.public-ranking .sheet-values{min-width:620px}.public-ranking .sheet-values td,.public-ranking .sheet-values th{padding:8px 6px}.public-ranking .team-name{white-space:normal}.public-ranking .ranking-rule{font-size:11px}}
