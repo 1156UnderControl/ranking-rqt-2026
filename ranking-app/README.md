@@ -71,3 +71,9 @@ A aplicação segue o edital para classificação e desempate, com a interpreta�
 O botão Ranking / Cronograma alterna as telas. O link `/#cronograma` abre diretamente a programação. As seções disponíveis são programação geral, mesas híbridas, mesas teleoperadas, Desafio Pesquisa e números das equipes. Cada seção possui paginação automática, pausa, navegação manual e duração configurável. A alternância do ranking é suspensa enquanto o cronograma está aberto.
 
 A API `/api/schedule` lê somente `cronograma impressão!A1:H150` da planilha `1MoXLsNdB4P640zFobHNeUsguvxNHx9WrA4RWYuv0Ma0` (gid `1518659089`). A exportação CSV preserva os campos mistos que a inferência de tipos do gviz omite. A atualização ocorre a cada 30 segundos, com cache de até 10 segundos; falhas preservam os últimos dados válidos e mostram um aviso. Os horários são apresentados como previstos, sem inferir a atividade em andamento ou uma data não informada na planilha. A identificação de alianças usa somente a relação de equipes da mesma aba.
+
+## Cronômetro
+
+O menu Cronômetro abre `/#cronometro`, com opções de 2min30s e 5min, pausa, reinício, tela cheia e sons FRC amplificados. A cópia local em `public/cronometro/index.html` inclui os áudios e funciona sem depender do Sites. Ao sair da página Cronômetro, a partida é encerrada e o áudio é interrompido. O link independente https://cronometro-rqt.stemos-6057.chatgpt.site permanece online.
+
+Áudios: Team 254 Cheesy Arena, https://github.com/Team254/cheesy-arena/tree/main/static/audio. Os arquivos start.wav e end.wav foram normalizados sem clipping.

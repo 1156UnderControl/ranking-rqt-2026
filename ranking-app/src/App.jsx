@@ -13,9 +13,19 @@ const number = value => value.toLocaleString('pt-BR', {maximumFractionDigits: 2}
 const medal = rank => rank <= 3 ? `${['🥇', '🥈', '🥉'][rank - 1]} ${rank}º` : `${rank}º`
 
 export default function App() {
-  const [view, setView] = useState(() => window.location.hash === '#cronograma' ? 'schedule' : 'ranking')
-  const changeView = next => {setView(next); window.history.replaceState(null, '', next === 'schedule' ? '#cronograma' : window.location.pathname + window.location.search)}
-  useEffect(() => {const sync = () => setView(window.location.hash === '#cronograma' ? 'schedule' : 'ranking'); window.addEventListener('hashchange', sync); return () => window.removeEventListener('hashchange', sync)}, [])
+  const readView = () => ({'#cronograma': 'schedule', '#cronometro': 'timer'}[window.location.hash] || 'ranking')
+  const [view, setView] = useState(readView)
+  const changeView = next => {
+    setView(next)
+    const hash = {schedule: '#cronograma', timer: '#cronometro'}[next] || ''
+    window.history.pushState(null, '', window.location.pathname + window.location.search + hash)
+  }
+  useEffect(() => {
+    const sync = () => setView(readView())
+    window.addEventListener('hashchange', sync)
+    window.addEventListener('popstate', sync)
+    return () => {window.removeEventListener('hashchange', sync); window.removeEventListener('popstate', sync)}
+  }, [])
   const [sources, setSources] = useState({})
   const [boardIndex, setBoardIndex] = useState(0)
   const [pageIndex, setPageIndex] = useState(0)
@@ -107,9 +117,12 @@ export default function App() {
       <button onClick={() => setHidden(value => !value)} className="hide-leaderboard-controller-button" aria-label={hidden ? 'Mostrar controles' : 'Ocultar controles'} title={hidden ? 'Mostrar controles' : 'Ocultar controles'}>{hidden ? '◉' : '◌'}</button>
       <img src={rqtLogo} className="logo" alt="Robôs Que Transformam" />
       <div className="divider" />
-      <h1>{view === 'schedule' ? 'Cronograma RQT' : 'Ranking RQT 🏆'} <small>2026</small></h1>
-      <div className="view-toggle" role="group" aria-label="Exibição do telão"><button aria-pressed={view === 'ranking'} onClick={() => changeView('ranking')}>Ranking</button><button aria-pressed={view === 'schedule'} onClick={() => changeView('schedule')}>Cronograma</button></div>
+      <h1>{view === 'timer' ? 'Cronômetro RQT' : view === 'schedule' ? 'Cronograma RQT' : 'Ranking RQT 🏆'} <small>2026</small></h1>
+      <div className="view-toggle" role="group" aria-label="Exibição do telão"><button aria-pressed={view === 'ranking'} onClick={() => changeView('ranking')}>Ranking</button><button aria-pressed={view === 'schedule'} onClick={() => changeView('schedule')}>Cronograma</button><button aria-pressed={view === 'timer'} onClick={() => changeView('timer')}>Cronômetro</button></div>
     </header>
+    {view === 'timer' && <main className="timer-view">
+      <iframe src="/cronometro/index.html" title="Cronômetro de partidas RQT" allow="autoplay; fullscreen; screen-wake-lock" allowFullScreen />
+    </main>}
     {view === 'schedule' && <Schedule hidden={hidden} fullscreen={fullscreen} />}
     {view === 'schedule' && fullscreenError && <p role="status">{fullscreenError}</p>}
     <div className="ranking-view" hidden={view !== 'ranking'}>
