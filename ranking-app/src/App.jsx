@@ -1,473 +1,143 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {useCallback, useEffect, useRef, useState} from 'react'
 import rqtLogo from './assets/logoRQT.svg'
 import './App.css'
-import { BsFillPauseFill } from "@react-icons/all-files/bs/BsFillPauseFill";
-import { BsFillPlayFill } from "@react-icons/all-files/bs/BsFillPlayFill";
-import { BsSkipForwardFill } from "@react-icons/all-files/bs/BsSkipForwardFill";
-import { BsSkipBackwardFill } from "@react-icons/all-files/bs/BsSkipBackwardFill";
-import { BsArrowRepeat } from "@react-icons/all-files/bs/BsArrowRepeat";
-import { FaEye } from "@react-icons/all-files/fa/FaEye";
-import { FaEyeSlash } from "@react-icons/all-files/fa/FaEyeSlash";
 
+const BOARDS = [
+  {mode: 'hybrid', category: 0, label: 'Híbrido Categoria 1'},
+  {mode: 'hybrid', category: 1, label: 'Híbrido Categoria 2'},
+  {mode: 'teleop', category: 0, label: 'Teleoperado Categoria 1'},
+  {mode: 'teleop', category: 1, label: 'Teleoperado Categoria 2'},
+]
+const number = value => value.toLocaleString('pt-BR', {maximumFractionDigits: 2})
+const medal = rank => rank <= 3 ? `${['🥇', '🥈', '🥉'][rank - 1]} ${rank}º` : `${rank}º`
 
-function App() {
-  const [lastFetchTime, setLastFetchTime] = useState(null);
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [sheetValues, setSheetValues] = useState(null)
-  const [showValues, setShowValues] = useState(false)
-  const [leaderboardType, setLeaderboardType] = useState("Autônomo Categoria 1")
-  const timeInResetRef = useRef(0)
+export default function App() {
+  const [sources, setSources] = useState({})
+  const [boardIndex, setBoardIndex] = useState(0)
+  const [pageIndex, setPageIndex] = useState(0)
+  const [playing, setPlaying] = useState(true)
+  const [hidden, setHidden] = useState(false)
+  const [duration, setDuration] = useState(40)
+  const [elapsed, setElapsed] = useState(0)
+  const [pageSize, setPageSize] = useState(8)
+  const [fullscreenError, setFullscreenError] = useState('')
+  const tableArea = useRef(null)
+  const activeRequest = useRef(null)
 
-  const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY
-  const AUTO_SPREADSHEET_ID = import.meta.env.VITE_AUTO_SPREADSHEET_ID
-  const TELEOP_SPREADSHEET_ID = import.meta.env.VITE_TELEOP_SPREADSHEET_ID
-  const SHEET_RANGE_TELEOP_CAT_1 = 'RankingTeleop1!A3:C13'
-  const SHEET_RANGE_TELEOP_CAT_2 = 'RankingTeleop2!A3:C8'
-  const SHEET_RANGE_AUTO_CAT_1 = 'RankingAutonomo1!A3:E13'
-  const SHEET_RANGE_AUTO_CAT_2 = 'RankingAutonomo2!A3:E8'
-  const [actualTimeInLeaderboard, setActualTimeInLeaderboard] = useState(0)
-  const [timerStopped, setTimerStopped] = useState(true)
-  const [hideController, setHideController] = useState(false);
-  const timerRef = useRef(null)
-  const sheetValuesWrapperRef = useRef(null)
-
-  const getRankingLabel = (position) => {
-    if (position === 1) {
-      return '🥇 1º'
-    }
-    if (position === 2) {
-      return '🥈 2º'
-    }
-    if (position === 3) {
-      return '🥉 3º'
-    }
-    return `#${position}`
-  }
-
-  const parseNumber = (value, fallback = 0) => {
-    if (typeof value === 'string' && value.trim().toUpperCase() === '#DIV/0!') {
-      return 0
-    }
-
-    if (typeof value === 'number') {
-      return value
-    }
-
-    if (typeof value === 'string') {
-      const normalized = value.replace(/[^\d,.-]/g, '').replace(',', '.')
-      const parsed = Number(normalized)
-
-      if (Number.isFinite(parsed)) {
-        return parsed
+  const refresh = useCallback(async () => {
+    if (activeRequest.current) return
+    const controller = new AbortController()
+    activeRequest.current = controller
+    const timeout = setTimeout(() => controller.abort(), 20000)
+    await Promise.allSettled(['hybrid', 'teleop'].map(async mode => {
+      setSources(previous => ({...previous, [mode]: {...previous[mode], loading: true}}))
+      try {
+        const response = await fetch(`/api/rankings?mode=${mode}`, {signal: controller.signal, cache: 'no-store'})
+        const payload = await response.json()
+        if (!response.ok) throw new Error(payload.error || 'Falha na atualização')
+        if (!Array.isArray(payload.categories) || payload.categories.length !== 2) throw new Error('Resposta de ranking inválida')
+        if (controller.signal.aborted) return
+        setSources(previous => ({...previous, [mode]: {...payload, loading: false, error: null}}))
+      } catch (error) {
+        if (controller.signal.reason === 'unmounted') return
+        setSources(previous => ({...previous, [mode]: {...previous[mode], loading: false, error: error.name === 'AbortError' ? 'A leitura excedeu o tempo limite.' : error.message}}))
       }
-    }
-
-    return fallback
-  }
-
-  const sortedSheetValues = useMemo(() => {
-    if (!sheetValues) {
-      return []
-    }
-    return sheetValues
-      .map((row, index) => ({
-        row: row,
-        originalIndex: index,
-      }))
-      .sort((a, b) => {
-        if(leaderboardType.includes("Autônomo")){
-          const [, matchesARaw, faultsAraw, best1ARaw, best2ARaw] = a.row
-          const [, matchesBRaw, faultsBraw, best1BRaw, best2BRaw] = b.row
-
-          const best1A = parseNumber(best1ARaw, 0)
-          const best1B = parseNumber(best1BRaw, 0)
-
-          if (best1A !== best1B) {
-            return best1B - best1A
-          }
-
-          const best2A = parseNumber(best2ARaw, 0)
-          const best2B = parseNumber(best2BRaw, 0)
-
-          if (best2A !== best2B) {
-            return best2B - best2A
-          }
-
-          const faultsA = parseNumber(faultsAraw, Number.POSITIVE_INFINITY)
-          const faultsB = parseNumber(faultsBraw, Number.POSITIVE_INFINITY)
-
-          return faultsA - faultsB
-        }
-        const [, matchesARaw, scoreARaw] = a.row
-        const [, matchesBRaw, scoreBRaw] = b.row
-
-        const scoreA = parseNumber(scoreARaw, 0)
-        const scoreB = parseNumber(scoreBRaw, 0)
-
-        if (scoreA !== scoreB) {
-          return scoreB - scoreA
-        }
-
-        const matchesA = parseNumber(matchesARaw, Number.POSITIVE_INFINITY)
-        const matchesB = parseNumber(matchesBRaw, Number.POSITIVE_INFINITY)
-
-        if (matchesA !== matchesB) {
-          return matchesA - matchesB
-        }
-
-        return a.originalIndex - b.originalIndex
-      })
-      .map((entry) => entry.row)
-  }, [sheetValues])
-
-const ranks = useMemo(() => {
-  const out = [];
-  let lastScore = null;
-  let lastRank = 0;
-  let seen = 0;
-
-  for (const row of sortedSheetValues) {
-    seen++;
-    const score = parseNumber(row[2], 0);
-
-    if (score !== lastScore) {
-      lastRank = seen;
-      lastScore = score;
-    }
-    out.push(lastRank);
-  }
-  return out;
-}, [sortedSheetValues]);
-
-
-  const startLeaderboardTimer = useCallback(() => {
-    if (timerRef.current) {
-      return
-    }
-    setActualTimeInLeaderboard(0)
-    timerRef.current = setInterval(() => {
-      setActualTimeInLeaderboard((previousTime) => previousTime + 1)
-    }, 1000)
-    setTimerStopped(false)
+    }))
+    clearTimeout(timeout)
+    if (activeRequest.current === controller) activeRequest.current = null
   }, [])
 
-  const stopLeaderboardTimer = useCallback(() => {
-    if (!timerRef.current) {
-      return
-    }
-    clearInterval(timerRef.current)
-    timerRef.current = null
-    setTimerStopped(true)
-    setActualTimeInLeaderboard(0)
+  useEffect(() => {
+    refresh()
+    const interval = setInterval(refresh, 30000)
+    return () => {clearInterval(interval); activeRequest.current?.abort('unmounted'); activeRequest.current = null}
+  }, [refresh])
+
+  useEffect(() => {
+    const observer = new ResizeObserver(([entry]) => setPageSize(Math.max(1, Math.floor((entry.contentRect.height - 62) / 62))))
+    observer.observe(tableArea.current)
+    return () => observer.disconnect()
   }, [])
 
-  const toggleTimer = () => {
-    if(timerStopped){
-      startLeaderboardTimer()
-    }else{
-      stopLeaderboardTimer()
-    }
-  }
+  const board = BOARDS[boardIndex]
+  const source = sources[board.mode]
+  const rows = source?.categories?.[board.category] ?? []
+  const pages = Math.max(1, Math.ceil(rows.length / pageSize))
+  const currentPage = Math.min(pageIndex, pages - 1)
+  const visibleRows = rows.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
 
-  const changeLeaderboardType = () => {
-    var nextType;
+  const next = useCallback(() => {
+    if (currentPage + 1 < pages) setPageIndex(currentPage + 1)
+    else {setBoardIndex(index => (index + 1) % BOARDS.length); setPageIndex(0)}
+    setElapsed(0)
+  }, [currentPage, pages])
 
-    switch(leaderboardType){
-      case "Autônomo Categoria 1":
-        nextType = "Autônomo Categoria 2"
-        break;
-      case "Autônomo Categoria 2":
-        nextType = "Teleoperado Categoria 1"
-        break;
-      case "Teleoperado Categoria 1":
-        nextType = "Teleoperado Categoria 2"
-        break;
-      case "Teleoperado Categoria 2":
-        nextType = "Autônomo Categoria 1"
-        break;
-      default:
-        nextType = "Autônomo Categoria 1"
+  const previous = () => {
+    if (currentPage > 0) setPageIndex(currentPage - 1)
+    else {
+      const index = (boardIndex + BOARDS.length - 1) % BOARDS.length
+      const prior = BOARDS[index]
+      const count = sources[prior.mode]?.categories?.[prior.category]?.length ?? 0
+      setBoardIndex(index); setPageIndex(Math.max(0, Math.ceil(count / pageSize) - 1))
     }
-    console.log("Changing leaderboard to: ", nextType);
-    setLeaderboardType(nextType)
-    setActualTimeInLeaderboard(0)
+    setElapsed(0)
   }
 
   useEffect(() => {
-    fetchActualTypeSheetData()
-  }, [leaderboardType])
+    if (!playing) return
+    const interval = setInterval(() => setElapsed(value => value + 1), 1000)
+    return () => clearInterval(interval)
+  }, [playing])
+  useEffect(() => {if (elapsed >= duration) next()}, [elapsed, duration, next])
 
-  const fetchActualTypeSheetData = async () => {
-    if(leaderboardType.includes("Autônomo")){
-      await fetchAutonomousSheetData()
-    }else{  
-      await fetchTeleopSheetData()
-    }
-  }
-
-  const fetchAutonomousSheetData = async () => {
-    console.log("Fetching autonomous sheet data for type: ", leaderboardType);
-    if(leaderboardType === "Autônomo Categoria 1"){
-      await fetchSheetData(AUTO_SPREADSHEET_ID, SHEET_RANGE_AUTO_CAT_1)
-    }else{
-      await fetchSheetData(AUTO_SPREADSHEET_ID, SHEET_RANGE_AUTO_CAT_2)
-    }
-  }
-
-  const fetchTeleopSheetData = async () => {
-    if(leaderboardType === "Teleoperado Categoria 1"){
-      await fetchSheetData(TELEOP_SPREADSHEET_ID, SHEET_RANGE_TELEOP_CAT_1)
-    }else{
-      await fetchSheetData(TELEOP_SPREADSHEET_ID, SHEET_RANGE_TELEOP_CAT_2)
-    }
-  }
-
-  async function fetchSheetData(SPREADSHEET_ID, SHEET_RANGE = SHEET_RANGE_AUTO) {
-    console.log("Fetching sheet data for: ", SPREADSHEET_ID, SHEET_RANGE);
-    if (!SPREADSHEET_ID) {
-      setError('Spreadsheet ID Auto não configurada. Crie uma variável VITE_SPREADSHEET_ID no .env .')
-      return
-    }
-
-    if (!API_KEY) {
-      setError('API key não configurada. Crie uma variável VITE_GOOGLE_API_KEY no .env .')
-      return
-    }
-    setIsLoading(true)
-    setError(null)
-    setShowValues(false)
+  const fullscreen = async () => {
     try {
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(SHEET_RANGE)}?key=${API_KEY}`
-      const response = await fetch(url)
-
-      if (!response.ok) {
-        throw new Error(`Sheets API responded with ${response.status}`)
-      }
-      const data = await response.json()
-      setSheetValues(data.values || [])
-      setShowValues(true)
-      setLastFetchTime(new Date().getHours() + ':' + new Date().getMinutes().toString().padStart(2, '0'));
-    } catch (err) {
-      setSheetValues(null)
-      setError(err.message)
-      setShowValues(false)
-    } finally {
-      setIsLoading(false)
-    }
+      if (document.fullscreenElement) await document.exitFullscreen()
+      else await document.documentElement.requestFullscreen()
+      setFullscreenError('')
+    } catch {setFullscreenError('Use a opção de tela cheia do navegador.')}
   }
 
-  useEffect(() => {
-    startLeaderboardTimer()
-    return () => {
-      stopLeaderboardTimer()
-    }
-  }, [startLeaderboardTimer, stopLeaderboardTimer])
-
-  useEffect(() => {
-    fetchActualTypeSheetData()
-  }, [])
-
-  useEffect(() => {
-    if(actualTimeInLeaderboard > 40){
-      changeLeaderboardType()
-    }
-  }, [actualTimeInLeaderboard])
-
-  useEffect(() => {
-    if (!showValues || sortedSheetValues.length === 0) {
-      return
-    }
-
-    const wrapper = sheetValuesWrapperRef.current
-
-    if (!wrapper) {
-      return
-    }
-
-    let animationFrameId
-    let lastTimestamp
-    let scrollPosition = 0
-    const scrollSpeed = 35
-
-    const resetScroll = () => {
-      scrollPosition = 0
-      wrapper.scrollTop = 0
-      lastTimestamp = undefined 
-      timeInResetRef.current = 0
-    }
-
-    const step = (timestamp) => {
-      if (lastTimestamp !== undefined) {
-        const delta = timestamp - lastTimestamp
-        const maxScrollTop = wrapper.scrollHeight - wrapper.clientHeight
-        const increment = (scrollSpeed * delta) / 1000
-        if(scrollPosition <= maxScrollTop-3){
-          timeInResetRef.current = 0
-          scrollPosition = (scrollPosition + increment) % maxScrollTop
-        }else{
-          timeInResetRef.current += 1
-          if(timeInResetRef.current > 100){
-            scrollPosition = (scrollPosition + increment) % maxScrollTop
-          }else{
-            scrollPosition = maxScrollTop;
-          }
-        }
-        wrapper.scrollTop = scrollPosition
-      }
-      lastTimestamp = timestamp
-      animationFrameId = requestAnimationFrame(step)
-    }
-
-    animationFrameId = requestAnimationFrame(step)
-
-    return () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId)
-      }
-      resetScroll()
-    }
-  }, [showValues, sortedSheetValues])
-
-  const toggleHideController = () => {
-    setHideController((prev) => !prev);
-  }
-
-  function rightIconForTimer(){
-    if(timerStopped){
-      return <BsFillPlayFill />
-    }else{
-      return <BsFillPauseFill />
-    }
-  }
-
-  function hideControllerIcon(){
-    if(hideController){
-      return <FaEye />
-    }else{
-      return <FaEyeSlash />
-    }
-  }
-
-  function getRightTh(){
-    if(leaderboardType.includes("Autônomo")){
-      return (
-        <>
-          <th className="sheet-values__rank">Ranking</th>
-          <th className="sheet-values__team">Equipe</th>
-          <th className="sheet-values__matches">Partidas jogadas</th>
-          <th className="sheet-values__score">Faltas</th>
-          <th className="sheet-values__score">Melhor pontuação</th>
-          <th className="sheet-values__score">Segunda melhor pontuação</th>
-        </>
-      )
-    }else{
-      return (
-        <>
-          <th className="sheet-values__rank">Ranking</th>
-          <th className="sheet-values__team">Equipe</th>
-          <th className="sheet-values__matches">Partidas jogadas</th>
-          <th className="sheet-values__score">Pontuação</th>
-        </>
-      )    }
-  }
-
-  function getRightTbody(){
-    if(leaderboardType.includes("Autônomo")){
-      return (
-        <>
-          <tbody>
-            {sortedSheetValues.map((row, rowIndex) => {
-              const [team = '-', matches = '-', faults = '-', best1 = '-', best2 = '-'] = row
-              const teamValue = typeof team === 'string' && team.trim() !== '' ? team : '-'
-              const matchesValue = parseNumber(matches, 0)
-              const faultValue = parseNumber(faults, 0)
-              const best1Value = parseNumber(best1, 0)
-              const best2Value = parseNumber(best2, 0);
-              return (
-                <tr key={rowIndex}>
-                  <td className="sheet-values__rank">{getRankingLabel(ranks[rowIndex])}</td>
-                  <td>{teamValue}</td>
-                  <td className="sheet-values__matches">{matchesValue}</td>
-                  <td className="sheet-values__score">{faultValue}</td>
-                  <td className="sheet-values__score">{best1Value}</td>
-                  <td className="sheet-values__score">{best2Value}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </>
-      )
-    }else{
-      return (
-        <>
-          <tbody>
-            {sortedSheetValues.map((row, rowIndex) => {
-              const [team = '-', matches = '-', score = '-'] = row
-              const teamValue = typeof team === 'string' && team.trim() !== '' ? team : '-'
-              const matchesValue = parseNumber(matches, 0)
-              const scoreValue = parseNumber(score, 0)
-              return (
-                <tr key={rowIndex}>
-                  <td className="sheet-values__rank">{getRankingLabel(ranks[rowIndex])}</td>
-                  <td>{teamValue}</td>
-                  <td className="sheet-values__matches">{matchesValue}</td>
-                  <td className="sheet-values__score">{scoreValue}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </>
-      )    }
-  }
-
-  return (
-    <>
-      <div className="header">
-        <button onClick={toggleHideController} className='hide-leaderboard-controller-button'>
-          {hideControllerIcon()}
-        </button>
-        <img src={rqtLogo} className="logo" alt="RQT Logo" />
-        <div className="divider"></div>
-        <h1>Ranking RQT 🏆</h1>
+  return <>
+    <header className="header">
+      <button onClick={() => setHidden(value => !value)} className="hide-leaderboard-controller-button" aria-label={hidden ? 'Mostrar controles' : 'Ocultar controles'} title={hidden ? 'Mostrar controles' : 'Ocultar controles'}>{hidden ? '◉' : '◌'}</button>
+      <img src={rqtLogo} className="logo" alt="Robôs Que Transformam" />
+      <div className="divider" />
+      <h1>Ranking RQT 🏆 <small>2026</small></h1>
+    </header>
+    {!hidden && <nav className="leaderboard-controller" aria-label="Controles do telão">
+      <button onClick={previous} aria-label="Página anterior" title="Página anterior">⏮</button>
+      <button onClick={() => setPlaying(value => !value)} aria-label={playing ? 'Pausar alternância' : 'Iniciar alternância'} title={playing ? 'Pausar alternância' : 'Iniciar alternância'}>{playing ? 'Ⅱ' : '▶'}</button>
+      <button onClick={next} aria-label="Próxima página" title="Próxima página">⏭</button>
+      <button onClick={refresh} disabled={Object.values(sources).some(item => item.loading)} title="Atualizar pontuações" aria-label="Atualizar pontuações">↻</button>
+      <select aria-label="Categoria" value={boardIndex} onChange={event => {setBoardIndex(Number(event.target.value)); setPageIndex(0); setElapsed(0)}}>{BOARDS.map((item, index) => <option key={item.label} value={index}>{item.label}</option>)}</select>
+      <label>Trocar a cada <select aria-label="Duração de cada página" value={duration} onChange={event => {setDuration(Number(event.target.value)); setElapsed(0)}}>{[10, 20, 40, 60].map(value => <option key={value} value={value}>{value}s</option>)}</select></label>
+      <button onClick={fullscreen}>Tela cheia</button>
+      {fullscreenError && <span role="status">{fullscreenError}</span>}
+    </nav>}
+    <div className="leaderboard-status__bar" role="progressbar" aria-label="Tempo até a próxima página" aria-valuemin={0} aria-valuemax={duration} aria-valuenow={Math.min(elapsed, duration)}>
+      <div style={{width: `${Math.min(100, elapsed / duration * 100)}%`}} />
+    </div>
+    <main className="leaderboard">
+      <div className="board-heading"><h2>{board.label}</h2><span className="page-label">Página {currentPage + 1} de {pages} · {playing ? 'Alternância automática' : 'Pausado'}</span></div>
+      <p className="ranking-rule">{board.mode === 'hybrid' ? 'Soma → mais partidas autônomas → melhor partida → 2ª melhor → menos penalidades. Autônomo ×2,5.' : 'Média dos pontos → melhor partida → 2ª melhor → 3ª melhor.'}</p>
+      <div className="data-status" aria-live="polite">
+        {source?.updatedAt ? <>Atualizado às {new Date(source.updatedAt).toLocaleTimeString('pt-BR')} · atualização automática a cada 30s{source.loading && ' · Atualizando…'}</> : source?.loading ? 'Buscando dados das planilhas…' : 'Aguardando leitura da planilha'}
       </div>
-      {!hideController && (      
-        <div className="leaderboard-controller">
-          <button onClick={toggleTimer}>
-          {rightIconForTimer()}
-          </button>
-          <button onClick={fetchActualTypeSheetData}>
-          <BsArrowRepeat />
-          </button>
-          <button onClick={changeLeaderboardType}>
-          <BsSkipForwardFill />
-          </button>
-          <h4>Ultima atualização: {lastFetchTime} </h4>
-        </div>
-        )
-      }
-      <div className="leaderboard-status__bar">
-        <div id="switch-progress"></div>
+      {source?.error && <p className="error" role="alert">{source.updatedAt && 'Exibindo a última leitura válida. '}{source.error}</p>}
+      {source?.warnings?.length > 0 && <details className="warnings"><summary>{source.warnings.length} aviso(s) na apuração</summary><ul>{source.warnings.map((warning, i) => <li key={i}>{warning}</li>)}</ul></details>}
+      <div ref={tableArea} className="table-area">
+        {rows.length > 0 ? <div className="sheet-values__wrapper"><table className="sheet-values">
+          <thead><tr><th className="sheet-values__rank">Ranking</th><th>Equipe</th><th className="numeric">Partidas</th><th className="numeric">{board.mode === 'hybrid' ? 'Soma' : 'Média'}</th>{board.mode === 'hybrid' && <><th className="numeric">Autônomas</th><th className="numeric">Faltas</th></>}<th className="best-scores">Melhores partidas<br /><small>{board.mode === 'hybrid' ? '1ª · 2ª' : '1ª · 2ª · 3ª'}</small></th></tr></thead>
+          <tbody>{visibleRows.map(team => <tr key={team.name}>
+            <td className="sheet-values__rank">{team.matches ? medal(team.rank) : <span className="not-played">Aguardando</span>}</td>
+            <td className="team-name" title={team.name}>{team.name}</td><td className="numeric">{team.matches}</td><td className="numeric sheet-values__score" title={String(board.mode === 'hybrid' ? team.total : team.average)}>{number(board.mode === 'hybrid' ? team.total : team.average)}</td>
+            {board.mode === 'hybrid' && <><td className="numeric">{team.autonomousMatches}</td><td className="numeric">{team.faults}</td></>}
+            <td className="best-scores" title={team.scores.map(number).join(' · ')}><div>{team.scores.length ? team.scores.slice(0, board.mode === 'hybrid' ? 2 : 3).map(number).join(' · ') : 'Sem partidas'}</div></td>
+          </tr>)}</tbody>
+        </table></div> : <div className="empty-state">{source?.error ? 'Não foi possível carregar este ranking.' : source?.loading ? 'Carregando equipes…' : 'Nenhuma equipe cadastrada nesta categoria.'}</div>}
       </div>
-      <div className="leaderboard">
-        <h2 className=''>{leaderboardType}</h2>
-        {error && <p role="alert">{error}</p>}
-        {isLoading && <p>Buscando dados...</p>}
-        {showValues && (
-          <div ref={sheetValuesWrapperRef} className="sheet-values__wrapper">
-            <table className="sheet-values">
-              <thead>
-                <tr>
-                  {getRightTh()}
-                </tr>
-              </thead>
-                {getRightTbody()}
-            </table>
-          </div>
-        )}
-      </div>
-    </>
-  )
+      <footer>Empates em todos os critérios mantêm a mesma posição. {rows.length} equipes nesta categoria. Média exibida com até 2 casas; classificação sem arredondamento.</footer>
+    </main>
+  </>
 }
-
-export default App
