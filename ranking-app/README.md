@@ -74,6 +74,10 @@ A API `/api/schedule` lê somente `cronograma impressão!A1:H150` da planilha `1
 
 ## Cronômetro
 
-O menu Cronômetro abre `/#cronometro`, com opções de 2min30s e 5min, pausa, reinício, tela cheia e sons FRC amplificados. A cópia local em `public/cronometro/index.html` inclui os áudios e funciona sem depender do Sites. Ao sair da página Cronômetro, a partida é encerrada e o áudio é interrompido. O link independente https://cronometro-rqt.stemos-6057.chatgpt.site permanece online.
+O menu Cronômetro abre `/#cronometro`, com opções de 2min30s e 5min, pausa, reinício, tela cheia e sons FRC amplificados. A página em `public/cronometro/index.html` usa a API compartilhada do Sites (D1). Ao sair da página, a partida continua para os demais computadores; somente o áudio local é interrompido. O link independente https://cronometro-rqt.stemos-6057.chatgpt.site permanece online.
 
 Áudios: Team 254 Cheesy Arena, https://github.com/Team254/cheesy-arena/tree/main/static/audio. Os arquivos start.wav e end.wav foram normalizados sem clipping.
+
+O estado único persiste em D1 e é consultado a cada 500 ms. Início/retomada são agendados 1,8 s adiante para distribuição aos clientes; todos usam o horário do servidor com compensação de latência. Comandos usam revisão para evitar sobrescrita concorrente. Ao perder conexão, os controles são bloqueados e a tela informa a perda de sincronização. Cada navegador precisa de um clique em Ativar som neste computador para áudio remoto.
+
+A próxima partida segue o horário de Brasília, usando /api/schedule e as seis mesas da planilha. Anterior/Próxima e Seguir horário compartilham a seleção; iniciar fixa a partida exibida. A seleção não altera o tempo nem as planilhas.
